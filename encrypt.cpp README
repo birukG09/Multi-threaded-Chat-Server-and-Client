@@ -1,0 +1,78 @@
+
+---
+
+### encrypt.cpp (using Crypto++)
+
+```cpp
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <cryptopp/aes.h>
+#include <cryptopp/filters.h>
+#include <cryptopp/files.h>
+#include <cryptopp/hex.h>
+#include <cryptopp/modes.h>
+#include <cryptopp/pwdbased.h>
+
+using namespace CryptoPP;
+
+void encrypt_file(const std::string& input, const std::string& output, const std::string& password) {
+    byte key[AES::DEFAULT_KEYLENGTH], iv[AES::BLOCKSIZE];
+    PKCS5_PBKDF2_HMAC<SHA256> pbkdf;
+    pbkdf.DeriveKey(key, sizeof(key), 0, (byte*)password.data(), password.size(), nullptr, 0, 1024, 0.0f);
+    memset(iv, 0x00, AES::BLOCKSIZE);
+
+    CBC_Mode<AES>::Encryption enc;
+    enc.SetKeyWithIV(key, sizeof(key), iv);
+
+    FileSource fs(input.c_str(), true,
+        new StreamTransformationFilter(enc,
+            new FileSink(output.c_str())
+        )
+    );
+}
+
+void decrypt_file(const std::string& input, const std::string& output, const std::string& password) {
+    byte key[AES::DEFAULT_KEYLENGTH], iv[AES::BLOCKSIZE];
+    PKCS5_PBKDF2_HMAC<SHA256> pbkdf;
+    pbkdf.DeriveKey(key, sizeof(key), 0, (byte*)password.data(), password.size(), nullptr, 0, 1024, 0.0f);
+    memset(iv, 0x00, AES::BLOCKSIZE);
+
+    CBC_Mode<AES>::Decryption dec;
+    dec.SetKeyWithIV(key, sizeof(key), iv);
+
+    FileSource fs(input.c_str(), true,
+        new StreamTransformationFilter(dec,
+            new FileSink(output.c_str())
+        )
+    );
+}
+
+int main(int argc, char* argv[]) {
+    if (argc != 5) {
+        std::cout << "Usage: " << argv[0] << " <encrypt|decrypt> <inputfile> <outputfile> <password>\n";
+        return 1;
+    }
+
+    std::string mode = argv[1];
+    std::string input = argv[2];
+    std::string output = argv[3];
+    std::string password = argv[4];
+
+    try {
+        if (mode == "encrypt") {
+            encrypt_file(input, output, password);
+            std::cout << "File encrypted successfully.\n";
+        } else if (mode == "decrypt") {
+            decrypt_file(input, output, password);
+            std::cout << "File decrypted successfully.\n";
+        } else {
+            std::cout << "Unknown mode. Use 'encrypt' or 'decrypt'.\n";
+        }
+    } catch (const Exception& e) {
+        std::cerr << "Error: " << e.what() << "\n";
+        return 1;
+    }
+
+    return 0;
+}
